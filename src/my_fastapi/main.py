@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 
-app = FastAPI(title="fastapi_testing", lifespan=lifespan)
+app = FastAPI(title="my_fastapi", lifespan=lifespan)
 
 
 @app.get("/")

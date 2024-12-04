@@ -5,9 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from httpx import AsyncClient
 from sqlmodel import select
 
-from fastapi_testing.models import Item
-
-from .main import app
+from .models import Item
 
 
 async def test_index(ac: AsyncClient):

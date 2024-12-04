@@ -16,7 +16,7 @@ requires-python = ">= 3.8"
 
 [tool.rye.scripts]
 test = "rye run pytest"
-dev = "fastapi dev src/fastapi_testing/main.py"
+dev = "fastapi dev src/my_fastapi/main.py"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,4 +30,4 @@ dev-dependencies = ["pytest>=8.3.3", "pytest-asyncio>=0.24.0"]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fastapi_testing"]
+packages = ["src/my_fastapi"]

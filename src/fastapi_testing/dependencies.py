@@ -31,7 +31,6 @@ _async_sessionmaker: async_sessionmaker | None = None
 # https://fastapi.tiangolo.com/advanced/async-tests/#other-asynchronous-function-calls
 async def initialise_async_engine():
     global _async_engine
-    global _async_sessionmaker
     if _async_engine is None:
         _async_engine = create_async_engine(
             settings.DATABASE_URL_ASYNC,
@@ -43,22 +42,19 @@ async def initialise_async_engine():
             # pool_recycle=3600,  # Recycle connections after 1 hour
             # pool_timeout=120,  # Raise an exception after 2 minutes if no connection is available from the pool
         )
-        _async_sessionmaker = async_sessionmaker(
-            bind=_async_engine, expire_on_commit=False
-        )
         return _async_engine
 
 
+async def initialise_async_session_maker() -> async_sessionmaker[AsyncSession]:
+    global _async_sessionmaker
+    _async_sessionmaker = async_sessionmaker(bind=_async_engine, expire_on_commit=False)
+    return _async_sessionmaker
+
+
 # Async session generator
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    if _async_engine is None or _async_sessionmaker is None:
+async def get_async_session_maker() -> (
+    AsyncGenerator[async_sessionmaker[AsyncSession], None]
+):
+    if _async_sessionmaker is None:
         raise Exception("Async engine and/or sessionmaker not initialized")
-
-    session = _async_sessionmaker()
-    if session is None:
-        raise Exception("Database Session could not be initialized")
-
-    try:
-        yield session
-    finally:
-        await session.close()
+    yield _async_sessionmaker

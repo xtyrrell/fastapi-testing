@@ -1,75 +1,74 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Generator
+
 import pytest
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 import pytest_asyncio
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
-from sqlalchemy import NullPool, StaticPool, text
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engine
-
-
-from . import settings
-from .dependencies import get_async_session
-
+from .dependencies import get_async_session_maker
 from .main import app
 
-# The following forces all tests to use the session event loop.
-# ---
-# import pytest
-
-# from pytest_asyncio import is_async_test
+from . import settings
 
 
-# def pytest_collection_modifyitems(items):
-#     pytest_asyncio_tests = (item for item in items if is_async_test(item))
-#     session_scope_marker = pytest.mark.asyncio(loop_scope="session")
-#     for async_test in pytest_asyncio_tests:
-#         async_test.add_marker(session_scope_marker, append=False)
-# ---
+# TODO: MAX: Probably use this to do the general database prep stuff like migrations etc
+# @pytest.fixture(scope="session", autouse=True)
+# def setup_test_db(setup_db: Generator) -> Generator:
+#     engine = create_engine(
+#         f"{settings.DATABASE_URL_ASYNC.replace('+asyncpg', '')}/test"
+#     )
 
-# MAX TODO NEXT:
-# try see if I can reproduce the issue from seadotdev-base tests here
-# by using a fixture to replace the async session and
-# using TestClient in a new test.
-# FIRST set up fixtures / tests as per https://medium.com/@navinsharma9376319931/mastering-fastapi-crud-operations-with-async-sqlalchemy-and-postgresql-3189a28d06a2
-# and / or https://praciano.com.br/fastapi-and-async-sqlalchemy-20-with-pytest-done-right.html
-# ACTUALLY USING https://docs.sqlalchemy.org/en/20/_modules/examples/asyncio/greenlet_orm.html
+#     with engine.begin():
+#         Base.metadata.drop_all(engine)
+#         Base.metadata.create_all(engine)
+#         yield
+#         Base.metadata.drop_all(engine)
+
+#     engine.dispose()
 
 
-@pytest_asyncio.fixture(scope="session", loop_scope="session")
-async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
-    engine = create_async_engine(
-        settings.DATABASE_URL_ASYNC,
-        # poolclass=StaticPool,
-        echo=True,
+@pytest.fixture
+async def async_session_maker() -> (
+    AsyncGenerator[async_sessionmaker[AsyncSession], None]
+):
+    # https://github.com/sqlalchemy/sqlalchemy/issues/5811#issuecomment-756269881
+    async_engine = create_async_engine(settings.DATABASE_URL_ASYNC)
+    async with async_engine.connect() as conn:
+        await conn.begin()
+        await conn.begin_nested()
+        _async_sessionmaker = async_sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=conn,
+            future=True,
+        )
+
+        # @event.listens_for(_async_sessionmaker.sync_session, "after_transaction_end")
+        # def end_savepoint(session: Session, transaction: SessionTransaction) -> None:
+        #     if conn.closed:
+        #         return
+        #     if not conn.in_nested_transaction():
+        #         if conn.sync_connection:
+        #             conn.sync_connection.begin_nested()
+
+        yield _async_sessionmaker
+        await conn.rollback()
+
+    await async_engine.dispose()
+
+
+@pytest.fixture
+async def ac(
+    async_session_maker: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncClient, None]:
+    def overridden_get_async_session_maker() -> Generator:
+        yield async_session_maker
+
+    app.dependency_overrides[get_async_session_maker] = (
+        overridden_get_async_session_maker
     )
 
-    yield engine
-
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture(scope="function", loop_scope="session")
-async def async_session(
-    async_engine: AsyncEngine,
-) -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSession(async_engine) as session:
-        async with session.begin():
-            await session.execute(
-                text(
-                    "CREATE TABLE IF NOT EXISTS item (id SERIAL PRIMARY KEY, name TEXT)"
-                )
-            )
-            yield session
-            await session.rollback()
-
-
-@pytest_asyncio.fixture(scope="function", loop_scope="session")
-async def client(async_session: AsyncSession):
-    async def override_get_async_session() -> AsyncGenerator[AsyncSession, None]:
-        yield async_session
-
-    app.dependency_overrides[get_async_session] = override_get_async_session
-
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac

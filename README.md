@@ -1,3 +1,3 @@
-# fastapi-testing
+# my-fastapi
 
-Describe your project here.
+A tiny, tested FastAPI reference app with async SQLAlchemy.

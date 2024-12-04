@@ -49,10 +49,3 @@ async def test_create_item(
         )
         assert res is not None
         assert res.name == "test"
-
-
-# From
-# https://pytest-asyncio.readthedocs.io/en/latest/how-to-guides/run_session_tests_in_same_loop.html
-# This ensures that all tests in the session use the same event loop.
-# We can probably clean this up by: removing this modifier hook and removing all the loop_scope="session" markers
-# and trying to set the loop to the correct scope in general.

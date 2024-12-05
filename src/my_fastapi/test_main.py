@@ -20,19 +20,15 @@ async def test_db_connection_database(ac: AsyncClient):
 
 
 async def test_async_session_maker(
-    async_session_maker: async_sessionmaker[AsyncSession],
+    async_session: AsyncSession,
 ):
-    assert async_session_maker is not None
+    assert async_session is not None
 
-    async with async_session_maker() as session:
-        res = await session.execute(text("SELECT VERSION()"))
-        assert res.one()[0].startswith("PostgreSQL")
+    res = await async_session.execute(text("SELECT VERSION()"))
+    assert res.one()[0].startswith("PostgreSQL")
 
 
-async def test_create_item(
-    ac: AsyncClient, async_session_maker: async_sessionmaker[AsyncSession]
-):
-    await asyncio.sleep(1)
+async def test_create_item(ac: AsyncClient, async_session: AsyncSession):
     response = await ac.post(
         "/items", json={"id": "10000000-0000-4000-9000-000000000000", "name": "test"}
     )
@@ -43,25 +39,19 @@ async def test_create_item(
         "name": "test",
     }
 
-    async with async_session_maker() as session:
-        res = await session.scalar(
-            select(Item).where(Item.id == "10000000-0000-4000-9000-000000000000")
-        )
-        assert res is not None
-        assert res.name == "test"
+    res = await async_session.scalar(
+        select(Item).where(Item.id == "10000000-0000-4000-9000-000000000000")
+    )
+    assert res is not None
+    assert res.name == "test"
 
 
-async def test_injected_session(
-    ac: AsyncClient, async_session_maker: async_sessionmaker[AsyncSession]
-):
+async def test_injected_session(ac: AsyncClient, async_session: AsyncSession):
     response = await ac.get("/injected-session")
     assert response.status_code == 200
     assert response.json()["name"] == "injected item"
 
-    async with async_session_maker() as async_session:
-        res = await async_session.scalars(
-            select(Item).where(Item.name == "injected item")
-        )
-        items = res.all()
-        assert len(items) == 1
-        assert items[0].name == "injected item"
+    res = await async_session.scalars(select(Item).where(Item.name == "injected item"))
+    items = res.all()
+    assert len(items) == 1
+    assert items[0].name == "injected item"

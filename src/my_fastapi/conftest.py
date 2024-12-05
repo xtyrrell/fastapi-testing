@@ -53,7 +53,7 @@ async def async_session(
     async_session_maker: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
-        return session
+        yield session
 
 
 @pytest.fixture

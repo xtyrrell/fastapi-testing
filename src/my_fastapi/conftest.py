@@ -68,6 +68,9 @@ async def async_session(
 async def ac(
     async_session_maker: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncClient, None]:
+    # Overriding the get_async_session_maker dependency is all we need
+    # to do because the async_session uses the async_session_maker and
+    # will therefore also connect to the test DB.
     def overridden_get_async_session_maker() -> Generator:
         yield async_session_maker
 

@@ -56,7 +56,7 @@ async def test_injected_session(
 ):
     response = await ac.get("/injected-session")
     assert response.status_code == 200
-    assert response.json()["database"] == "postgres"
+    assert response.json()["name"] == "injected item"
 
     async with async_session_maker() as async_session:
         res = await async_session.scalars(

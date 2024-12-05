@@ -12,7 +12,6 @@ from .dependencies import (
     initialise_async_engine,
     initialise_async_session_maker,
 )
-from .connection_from_docs import run_sync
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .models import Item
@@ -23,7 +22,6 @@ async def lifespan(app: FastAPI):
     print("Starting...")
     await initialise_async_engine()
     await initialise_async_session_maker()
-    await run_sync(SQLModel.metadata.create_all)
     yield
     print("Shutting down...")
 
@@ -40,7 +38,7 @@ def index():
 async def show_items(
     async_session_maker: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_async_session_maker)
-    ]
+    ],
 ):
     async with async_session_maker() as session:
         res = await session.scalars(select(Item))
@@ -68,22 +66,11 @@ async def get_injected_session(
     print("my-fastapi: get_injected_session", async_session)
 
     id = uuid.uuid4()
-    async_session.add(Item(id=id, name="injected item"))
+    item = Item(id=id, name="injected item")
+    async_session.add(item)
     await async_session.commit()
-
-    engine = async_session.get_bind()
-    url = engine.engine.url
-
-    db_info = {
-        "database_url": str(url),
-        "driver": url.drivername,
-        "database": url.database,
-        "host": url.host,
-        "port": url.port,
-        "username": url.username,
-    }
-
-    return db_info
+    await async_session.refresh(item)
+    return item
 
 
 @app.get("/db-connection")

@@ -1,6 +1,6 @@
 import asyncio
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from httpx import AsyncClient
 from sqlmodel import select
@@ -49,3 +49,19 @@ async def test_create_item(
         )
         assert res is not None
         assert res.name == "test"
+
+
+async def test_injected_session(
+    ac: AsyncClient, async_session_maker: async_sessionmaker[AsyncSession]
+):
+    response = await ac.get("/injected-session")
+    assert response.status_code == 200
+    assert response.json()["database"] == "postgres"
+
+    async with async_session_maker() as async_session:
+        res = await async_session.scalars(
+            select(Item).where(Item.name == "injected item")
+        )
+        items = res.all()
+        assert len(items) == 1
+        assert items[0].name == "injected item"

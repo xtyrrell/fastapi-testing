@@ -2,7 +2,6 @@ from typing import AsyncGenerator, Generator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from .dependencies import get_async_session_maker
@@ -55,6 +54,14 @@ async def async_session_maker() -> (
         await conn.rollback()
 
     await async_engine.dispose()
+
+
+@pytest.fixture
+async def async_session(
+    async_session_maker: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
 
 
 @pytest.fixture

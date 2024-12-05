@@ -1,11 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Annotated
+import uuid
 
 from fastapi import Depends, FastAPI
 from sqlmodel import SQLModel, select
 
 from .dependencies import (
+    get_async_session,
     get_async_session_maker,
     initialise_async_engine,
     initialise_async_session_maker,
@@ -36,11 +38,11 @@ def index():
 
 @app.get("/items")
 async def show_items(
-    async_session: Annotated[
+    async_session_maker: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_async_session_maker)
     ]
 ):
-    async with async_session() as session:
+    async with async_session_maker() as session:
         res = await session.scalars(select(Item))
         return [item for item in res]
 
@@ -48,24 +50,49 @@ async def show_items(
 @app.post("/items")
 async def create_item(
     item: Item,
-    async_session: Annotated[
+    async_session_maker: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_async_session_maker)
     ],
 ):
-    async with async_session() as session:
+    async with async_session_maker() as session:
         session.add(item)
         await session.commit()
         await session.refresh(item)
         return item
 
 
+@app.get("/injected-session")
+async def get_injected_session(
+    async_session: Annotated[AsyncSession, Depends(get_async_session)],
+):
+    print("my-fastapi: get_injected_session", async_session)
+
+    id = uuid.uuid4()
+    async_session.add(Item(id=id, name="injected item"))
+    await async_session.commit()
+
+    engine = async_session.get_bind()
+    url = engine.engine.url
+
+    db_info = {
+        "database_url": str(url),
+        "driver": url.drivername,
+        "database": url.database,
+        "host": url.host,
+        "port": url.port,
+        "username": url.username,
+    }
+
+    return db_info
+
+
 @app.get("/db-connection")
 async def get_db_connection(
-    async_session: Annotated[
+    async_session_maker: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_async_session_maker)
     ],
 ):
-    async with async_session() as session:
+    async with async_session_maker() as session:
         engine = session.get_bind()
         url = engine.engine.url
 

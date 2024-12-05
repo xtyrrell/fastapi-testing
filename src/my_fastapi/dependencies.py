@@ -1,9 +1,9 @@
 # import json
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Annotated
 
-from pydantic import json as pydantic_json
-from sqlalchemy import create_engine, StaticPool, text
+from fastapi import Depends
+from sqlalchemy import StaticPool
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -29,22 +29,18 @@ _async_sessionmaker: async_sessionmaker | None = None
 # within FastAPI's lifecycle manager; which may be needed (assuming create_async_engine
 # uses the current event loop) as per
 # https://fastapi.tiangolo.com/advanced/async-tests/#other-asynchronous-function-calls
+# TODO: MAX: This is not needed.
 async def initialise_async_engine():
     global _async_engine
     if _async_engine is None:
         _async_engine = create_async_engine(
             settings.DATABASE_URL_ASYNC,
-            poolclass=StaticPool,
-            # json_serializer=pydantic_json_serializer,
-            # pool_pre_ping=True,
-            # pool_size=4,  # Number of connections to keep open in the pool
-            # max_overflow=4,  # Number of connections that can be opened beyond the pool_size
-            # pool_recycle=3600,  # Recycle connections after 1 hour
-            # pool_timeout=120,  # Raise an exception after 2 minutes if no connection is available from the pool
+            echo=True,
         )
         return _async_engine
 
 
+# TODO: MAX: This is not needed.
 async def initialise_async_session_maker() -> async_sessionmaker[AsyncSession]:
     global _async_sessionmaker
     _async_sessionmaker = async_sessionmaker(bind=_async_engine, expire_on_commit=False)
@@ -58,3 +54,14 @@ async def get_async_session_maker() -> (
     if _async_sessionmaker is None:
         raise Exception("Async engine and/or sessionmaker not initialized")
     yield _async_sessionmaker
+
+
+async def get_async_session(
+    async_session_maker: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_async_session_maker)
+    ]
+) -> AsyncGenerator[AsyncSession, None]:
+    print("my-fastapi: get_async_session", async_session_maker)
+    async with async_session_maker() as session:
+        print("my-fastapi: GOT async session! It is: ", session)
+        yield session

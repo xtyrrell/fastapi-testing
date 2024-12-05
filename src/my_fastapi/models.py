@@ -1,9 +1,17 @@
-from typing import Optional
-from uuid import UUID, uuid4
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, text
+import uuid
+from typing import Annotated
 
-from sqlmodel import Field, SQLModel
+
+class Base(DeclarativeBase):
+    pass
 
 
-class Item(SQLModel, table=True):
-    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
-    name: str
+class Item(Base):
+    __tablename__ = "items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, default=uuid.uuid4, server_default=text("uuid_generate_v4()")
+    )
+    name: Mapped[str]

@@ -2,7 +2,10 @@ from typing import AsyncGenerator, Generator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
+
+from .models import Base
 
 from .dependencies import get_async_session_maker
 from .main import app
@@ -10,20 +13,17 @@ from .main import app
 from . import settings
 
 
-# TODO: MAX: Probably use this to do the general database prep stuff like migrations etc
-# @pytest.fixture(scope="session", autouse=True)
-# def setup_test_db(setup_db: Generator) -> Generator:
-#     engine = create_engine(
-#         f"{settings.DATABASE_URL_ASYNC.replace('+asyncpg', '')}/test"
-#     )
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    engine = create_engine(f"{settings.DATABASE_URL_ASYNC.replace('+asyncpg', '')}")
 
-#     with engine.begin():
-#         Base.metadata.drop_all(engine)
-#         Base.metadata.create_all(engine)
-#         yield
-#         Base.metadata.drop_all(engine)
+    with engine.begin():
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        yield
+        Base.metadata.drop_all(engine)
 
-#     engine.dispose()
+    engine.dispose()
 
 
 @pytest.fixture

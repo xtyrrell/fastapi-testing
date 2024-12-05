@@ -1,9 +1,7 @@
-import asyncio
-
-from sqlalchemy import func, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlalchemy import select
 
 from .models import Item
 

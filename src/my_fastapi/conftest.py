@@ -35,22 +35,16 @@ async def async_session_maker() -> (
     async with async_engine.connect() as conn:
         await conn.begin()
         await conn.begin_nested()
-        _async_sessionmaker = async_sessionmaker(
+
+        async_session_maker = async_sessionmaker(
             autocommit=False,
             autoflush=False,
             bind=conn,
             future=True,
         )
 
-        # @event.listens_for(_async_sessionmaker.sync_session, "after_transaction_end")
-        # def end_savepoint(session: Session, transaction: SessionTransaction) -> None:
-        #     if conn.closed:
-        #         return
-        #     if not conn.in_nested_transaction():
-        #         if conn.sync_connection:
-        #             conn.sync_connection.begin_nested()
+        yield async_session_maker
 
-        yield _async_sessionmaker
         await conn.rollback()
 
     await async_engine.dispose()

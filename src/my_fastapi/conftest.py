@@ -3,6 +3,7 @@ from typing import AsyncGenerator, Generator
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
+from sqlalchemy.pool import AssertionPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from .models import Base
@@ -31,17 +32,14 @@ async def async_session_maker() -> (
     AsyncGenerator[async_sessionmaker[AsyncSession], None]
 ):
     # https://github.com/sqlalchemy/sqlalchemy/issues/5811#issuecomment-756269881
-    async_engine = create_async_engine(settings.DATABASE_URL_ASYNC)
+    async_engine = create_async_engine(
+        settings.DATABASE_URL_ASYNC, poolclass=AssertionPool
+    )
     async with async_engine.connect() as conn:
         await conn.begin()
         await conn.begin_nested()
 
-        async_session_maker = async_sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=conn,
-            future=True,
-        )
+        async_session_maker = async_sessionmaker(expire_on_commit=False, bind=conn)
 
         yield async_session_maker
 
@@ -55,7 +53,7 @@ async def async_session(
     async_session_maker: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
-        yield session
+        return session
 
 
 @pytest.fixture
